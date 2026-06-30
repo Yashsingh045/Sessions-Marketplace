@@ -1,6 +1,6 @@
 import "./globals.css";
 
-import Navbar from "../components/Navbar";
+import Chrome from "../components/Chrome";
 import { AuthProvider } from "../lib/auth-context";
 import { ToastProvider } from "../lib/toast-context";
 
@@ -15,23 +15,7 @@ export default function RootLayout({ children }) {
       <body>
         <ToastProvider>
           <AuthProvider>
-            <Navbar />
-            <main className="main">{children}</main>
-            <footer className="footer">
-              <div className="container footer-inner">
-                <div className="footer-brand">
-                  <div className="brand-green">Ahoum</div>
-                  <p>© 2024 Ahoum. Elevating Consciousness through Technology.</p>
-                </div>
-                <nav className="footer-links">
-                  <a href="#">Terms of Service</a>
-                  <a href="#">Privacy Policy</a>
-                  <a href="#">Resources</a>
-                  <a href="#">Support</a>
-                  <a href="#">Newsletter</a>
-                </nav>
-              </div>
-            </footer>
+            <Chrome>{children}</Chrome>
           </AuthProvider>
         </ToastProvider>
       </body>

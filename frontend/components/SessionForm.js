@@ -19,6 +19,8 @@ export default function SessionForm({
   onCancel,
   submitting,
   error,
+  submitLabel = "Save session",
+  submitClassName = "btn primary",
 }) {
   const [form, setForm] = useState({
     title: initial?.title || "",
@@ -87,8 +89,8 @@ export default function SessionForm({
         <button type="button" className="btn ghost" onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className="btn primary" disabled={submitting}>
-          {submitting ? "Saving…" : "Save session"}
+        <button type="submit" className={submitClassName} disabled={submitting}>
+          {submitting ? "Saving…" : submitLabel}
         </button>
       </div>
     </form>

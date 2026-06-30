@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
 
 export default function Navbar() {
-  const { isAuthenticated, isCreator, user, logout, loading } = useAuth();
+  const { isAuthenticated, user, logout, loading } = useAuth();
   const pathname = usePathname();
 
   const linkClass = (href) =>
@@ -30,11 +30,6 @@ export default function Navbar() {
           {isAuthenticated && (
             <Link href="/dashboard" className={linkClass("/dashboard")}>
               Dashboard
-            </Link>
-          )}
-          {isCreator && (
-            <Link href="/creator" className={linkClass("/creator")}>
-              Creator
             </Link>
           )}
           {isAuthenticated ? (

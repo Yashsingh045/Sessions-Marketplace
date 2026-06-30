@@ -85,7 +85,13 @@ def _exchange_code_for_user(code, intended_role=None):
     }
     user, created = User.objects.get_or_create(github_id=github_id, defaults=defaults)
 
-    if created and intended_role in (User.Role.USER, User.Role.CREATOR):
+    # Honor the role chosen on the login screen ("Choose Your Path") for BOTH
+    # new and returning users, so picking User/Creator at login actually sets
+    # how they log in (not just the role saved previously in their profile).
+    if (
+        intended_role in (User.Role.USER, User.Role.CREATOR)
+        and user.role != intended_role
+    ):
         user.role = intended_role
         user.save(update_fields=["role"])
 

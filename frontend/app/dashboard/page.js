@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import CreatorDashboard from "../../components/CreatorDashboard";
+import DashboardShell from "../../components/DashboardShell";
 import Protected from "../../components/Protected";
 import { EmptyState, ErrorMessage, Loading } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
@@ -44,48 +46,34 @@ function NextSessionCard({ target }) {
   );
 }
 
-/* ---- Editable profile card (all details) ---- */
+/* ---- Profile card (minimal, matches mockup) ----
+   Avatar links to the full profile page (avatar upload + role switch live there);
+   Display Name is editable inline and saves on blur / Enter. */
 function ProfileCard() {
   const { user, applyUser } = useAuth();
   const toast = useToast();
-  const fileRef = useRef(null);
-  const [form, setForm] = useState({ name: "", role: "USER" });
+  const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    if (user) setForm({ name: user.name || "", role: user.role });
+    if (user) setName(user.name || "");
   }, [user]);
 
-  const save = async (e) => {
-    e.preventDefault();
+  const saveName = async () => {
+    if (!user || name.trim() === (user.name || "")) return;
     setSaving(true);
     try {
-      const updated = await apiFetch("/me/", { method: "PATCH", body: form });
+      const updated = await apiFetch("/me/", {
+        method: "PATCH",
+        body: { name: name.trim() },
+      });
       applyUser(updated);
-      toast.success("Profile updated.");
+      toast.success("Display name updated.");
     } catch (err) {
       toast.error(err.message);
+      setName(user.name || "");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploading(true);
-    try {
-      const data = new FormData();
-      data.append("avatar", file);
-      const updated = await apiFetch("/me/avatar/", { method: "POST", body: data });
-      applyUser(updated);
-      toast.success("Avatar updated.");
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -96,61 +84,28 @@ function ProfileCard() {
     <div className="card profile-panel">
       <h2>Profile</h2>
       <div className="pe-avatar">
-        {user.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.avatar} alt="" className="avatar-lg" />
-        ) : (
-          <div className="avatar-lg placeholder">{initial}</div>
-        )}
-        <button
-          type="button"
-          className="btn ghost sm"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-        >
-          {uploading ? "Uploading…" : "Change avatar"}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          hidden
-          onChange={onFile}
-        />
+        <Link href="/profile" title="Edit profile, avatar & role">
+          {user.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.avatar} alt="" className="avatar-lg" />
+          ) : (
+            <div className="avatar-lg placeholder">{initial}</div>
+          )}
+        </Link>
       </div>
 
-      <form className="form" onSubmit={save}>
-        <label>
-          Display Name
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-        </label>
-        <label>
-          Username
-          <input value={user.username} disabled />
-        </label>
-        <label>
-          Email
-          <input value={user.email || "—"} disabled />
-        </label>
-        <label>
-          Role
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="USER">User — book sessions</option>
-            <option value="CREATOR">Creator — host sessions</option>
-          </select>
-        </label>
-        <div className="form-actions">
-          <button className="btn primary" disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
-      </form>
+      <label className="pe-field">
+        Display Name
+        <input
+          value={name}
+          disabled={saving}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+        />
+      </label>
     </div>
   );
 }
@@ -168,16 +123,17 @@ function ActiveCard({ booking, onCancel, cancelling }) {
         👤 Guide: {s.creator_name || s.creator_username}
       </p>
       <div className="bk-actions">
-        <Link href={`/sessions/${s.id}`} className="btn ghost sm">
-          Details
-        </Link>
         <button
-          className="btn danger sm"
+          className="icon-btn"
+          title="Cancel booking"
           disabled={cancelling}
           onClick={() => onCancel(booking.id)}
         >
-          {cancelling ? "Cancelling…" : "Cancel"}
+          {cancelling ? "…" : "✕"}
         </button>
+        <Link href={`/sessions/${s.id}`} className="btn ghost sm bk-details">
+          Details
+        </Link>
       </div>
     </div>
   );
@@ -222,7 +178,7 @@ function DashboardInner() {
     .sort((a, b) => new Date(a) - new Date(b))[0];
 
   return (
-    <div className="container">
+    <>
       <div className="dash-top">
         <div>
           <h1>Welcome back, {user?.name || user?.username}.</h1>
@@ -289,14 +245,26 @@ function DashboardInner() {
           <ProfileCard />
         </aside>
       </div>
-    </div>
+    </>
+  );
+}
+
+// One dashboard route: the content follows the signed-in user's role, so a
+// USER who switches to CREATOR sees the creator dashboard on this same link
+// (no separate /creator link needed).
+function DashboardRouter() {
+  const { isCreator } = useAuth();
+  return (
+    <DashboardShell>
+      {isCreator ? <CreatorDashboard /> : <DashboardInner />}
+    </DashboardShell>
   );
 }
 
 export default function DashboardPage() {
   return (
     <Protected>
-      <DashboardInner />
+      <DashboardRouter />
     </Protected>
   );
 }

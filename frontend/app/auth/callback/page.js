@@ -32,9 +32,7 @@ export default function AuthCallbackPage() {
     window.history.replaceState({}, "", "/auth/callback");
 
     login(access, refresh)
-      .then((me) =>
-        router.replace(me.role === "CREATOR" ? "/creator" : "/dashboard")
-      )
+      .then(() => router.replace("/dashboard"))
       .catch(() => setError("Could not complete sign-in. Please try again."));
   }, [login, router]);
 
