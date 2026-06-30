@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import SessionCard from "../components/SessionCard";
 import { EmptyState, ErrorMessage, Loading } from "../components/ui";
 import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth-context";
+import { categoriesFrom, categoryOf } from "../lib/category";
+import { useBookedSessionIds } from "../lib/use-booked";
 
 export default function HomePage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState(null);
+  const bookedIds = useBookedSessionIds();
 
   useEffect(() => {
     let active = true;
@@ -26,52 +28,87 @@ export default function HomePage() {
     };
   }, []);
 
+  // Tags come from the actual sessions, so they always match what's bookable.
+  const chips = useMemo(() => categoriesFrom(sessions), [sessions]);
+
   const q = query.trim().toLowerCase();
-  const filtered = q
-    ? sessions.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          (s.description || "").toLowerCase().includes(q)
-      )
-    : sessions;
+  const filtered = sessions.filter((s) => {
+    const matchesText =
+      !q ||
+      s.title.toLowerCase().includes(q) ||
+      (s.description || "").toLowerCase().includes(q);
+    const matchesCategory =
+      !activeCategory || categoryOf(s) === activeCategory;
+    return matchesText && matchesCategory;
+  });
+
+  const toggleChip = (chip) =>
+    setActiveCategory((prev) => (prev === chip ? null : chip));
+
+  // Home features a curated subset; the full list lives on /catalog.
+  const featured = filtered.slice(0, 6);
 
   return (
-    <div className="container">
-      <section className="hero">
-        <h1>Find your next live session</h1>
-        <p className="muted">Learn from creators. Book a seat in seconds.</p>
-        <input
-          className="search"
-          placeholder="Search sessions…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+    <div>
+      <section className="hero-wrap container">
+        <div className="hero-card">
+          <h1>Discover Your Digital Sanctuary</h1>
+          <p className="hero-sub">
+            Explore curated spiritual sessions, from guided meditations to
+            immersive sound baths, designed to elevate your consciousness.
+          </p>
+          <div className="search-bar">
+            <span className="search-icon">🔍</span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search sessions, creators, or topics..."
+              aria-label="Search sessions"
+            />
+          </div>
+          {chips.length > 0 && (
+            <div className="chips">
+              {chips.map((chip) => (
+                <button
+                  key={chip}
+                  className={"chip" + (activeCategory === chip ? " active" : "")}
+                  onClick={() => toggleChip(chip)}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      {!authLoading && !isAuthenticated && (
-        <div className="cta-banner">
-          <span>Sign in to book sessions and track your bookings.</span>
-          <Link href="/login" className="btn primary sm">
-            Sign in with GitHub
+      <section className="container featured">
+        <div className="featured-head">
+          <div>
+            <h2>Featured Sessions</h2>
+            <p className="muted">Curated experiences for your journey.</p>
+          </div>
+          <Link className="view-all" href="/catalog">
+            View All →
           </Link>
         </div>
-      )}
 
-      {loading ? (
-        <Loading label="Loading catalog…" />
-      ) : error ? (
-        <ErrorMessage>{error}</ErrorMessage>
-      ) : filtered.length === 0 ? (
-        <EmptyState title="No sessions found">
-          {q ? "Try a different search." : "Check back soon for new sessions."}
-        </EmptyState>
-      ) : (
-        <div className="grid">
-          {filtered.map((s) => (
-            <SessionCard key={s.id} session={s} />
-          ))}
-        </div>
-      )}
+        {loading ? (
+          <Loading label="Loading sessions…" />
+        ) : error ? (
+          <ErrorMessage>{error}</ErrorMessage>
+        ) : featured.length === 0 ? (
+          <EmptyState title="No sessions found">
+            {q ? "Try a different search." : "Check back soon for new sessions."}
+          </EmptyState>
+        ) : (
+          <div className="grid">
+            {featured.map((s) => (
+              <SessionCard key={s.id} session={s} booked={bookedIds.has(s.id)} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

@@ -16,8 +16,3 @@ export function decodeJwt(token) {
     return null;
   }
 }
-
-export function isExpired(decoded) {
-  if (!decoded || !decoded.exp) return true;
-  return decoded.exp * 1000 <= Date.now();
-}

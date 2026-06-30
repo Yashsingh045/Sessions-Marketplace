@@ -17,10 +17,6 @@ export function ErrorMessage({ children }) {
   );
 }
 
-export function Notice({ type = "ok", children }) {
-  return <div className={`alert ${type}`}>{children}</div>;
-}
-
 export function EmptyState({ title, children }) {
   return (
     <div className="empty">

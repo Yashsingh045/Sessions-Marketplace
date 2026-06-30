@@ -44,34 +44,48 @@ class Command(BaseCommand):
         )
 
         now = timezone.now()
+        # Wellness-themed so the derived category tags (Meditation / Yoga /
+        # Sound Healing / Breathwork) are meaningful and match the UI theme.
         specs = [
             {
-                "title": "Intro to Django REST Framework",
-                "description": "Build a clean REST API: viewsets, serializers, JWT auth.",
-                "datetime": now + timedelta(days=3, hours=2),
+                "title": "Morning Clarity Meditation",
+                "description": "Start your day with focused breathwork and guided "
+                "visualization to set positive intentions.",
+                "datetime": now + timedelta(days=2, hours=2),
                 "price": Decimal("499.00"),
-                "capacity": 20,
+                "capacity": 25,
             },
             {
-                "title": "System Design Crash Course",
-                "description": "Scaling, caching, queues and trade-offs for interviews.",
-                "datetime": now + timedelta(days=7),
-                "price": Decimal("999.00"),
+                "title": "Sunrise Vinyasa Yoga Flow",
+                "description": "A gentle flowing yoga practice to awaken the body "
+                "and align breath with movement.",
+                "datetime": now + timedelta(days=4),
+                "price": Decimal("0.00"),
+                "capacity": 40,
+            },
+            {
+                "title": "Crystal Bowl Sound Healing Bath",
+                "description": "Deep cellular relaxation through the resonant "
+                "frequencies of alchemy crystal sound bowls.",
+                "datetime": now + timedelta(days=6, hours=5),
+                "price": Decimal("899.00"),
+                "capacity": 30,
+            },
+            {
+                "title": "Pranayama Breathwork Essentials",
+                "description": "Learn foundational breathing techniques to regulate "
+                "your nervous system and find calm.",
+                "datetime": now + timedelta(days=9),
+                "price": Decimal("299.00"),
                 "capacity": 50,
             },
             {
-                "title": "React + Next.js Hands-on Workshop",
-                "description": "Client-side rendering, hooks, and talking to a DRF API.",
-                "datetime": now + timedelta(days=10, hours=5),
-                "price": Decimal("0.00"),
-                "capacity": 100,
-            },
-            {
-                "title": "SQL Performance Tuning (past session)",
-                "description": "Indexes, query plans and N+1 fixes. Already happened.",
+                "title": "Restorative Meditation (past session)",
+                "description": "A grounding meditation to release tension. This "
+                "session has already taken place.",
                 "datetime": now - timedelta(days=5),
-                "price": Decimal("299.00"),
-                "capacity": 30,
+                "price": Decimal("399.00"),
+                "capacity": 20,
             },
         ]
 

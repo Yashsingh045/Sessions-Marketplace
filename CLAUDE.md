@@ -50,23 +50,57 @@
 - Rate limiting (bonus): scoped throttles — `AuthThrottle` (anon, scope `auth`, 20/min) on the 3 OAuth views; `BookingThrottle` (user, scope `booking`, 30/min) on booking-create + both payment endpoints. Requires a **shared cache** so counts don't fragment across gunicorn workers → Postgres `DatabaseCache` (table `throttle_cache`, created on startup); chosen over adding a Redis container.
 - MinIO uploads (bonus): `POST /api/me/avatar/` (multipart) saves to django-storages S3 at key `user_<id>/avatar.<ext>` (file_overwrite), stores the public URL on the user. Needs `AWS_S3_ADDRESSING_STYLE=path` (MinIO) + `AWS_S3_URL_PROTOCOL=http:` + custom domain `localhost:9000/avatars`; bucket made public-download by `minio-init`. `apiFetch` detects `FormData` and skips the JSON content-type.
 - Op note: nginx resolves `backend`/`frontend` upstream IPs at startup — restarting a single app container (new IP) makes nginx 502 until nginx is also restarted. Not an issue for `docker-compose up --build` (all start together); restart nginx after restarting one service.
+- UI redesign (Ahoum theme): switched to a **light theme** design system in `globals.css` — brand "Ahoum" (blue), Poppins headings + Space Mono UI labels + Inter body (loaded via Google Fonts `@import`). All shared class names kept so every page inherits the new look via CSS variables.
+- Routing: `/` = **Home** (hero + 6 featured), `/catalog` = full list with search + price filter (all/free/<₹500/₹500+) + sort (date/price). Nav = Home, Catalog, Dashboard (if auth), Creator (if creator). "View All" on Home → `/catalog`; card/detail "Book Now" → `/sessions/[id]`.
+- Session detail redesign: hero banner + info cards (Duration/Level/Capacity/Language) + About + What-to-Expect + Upcoming Times + sticky price/creator sidebar. Real data: title/desc/price/capacity/datetime/creator/seats + booking flow. Duration/Level/Language/What-to-Expect/Included/bio are **illustrative placeholders** (backend doesn't model them yet). Removed "View Full Calendar" & "View Profile" per request. Razorpay (not Stripe) noted in the secure line.
+- CSS minifier gotcha: cssnano strips `min-width: 0` (treats it as the initial value), which breaks flex-shrink. Use `overflow: hidden` on the flex item instead to force its automatic min-size to 0 (used on the hero search input).
+- Filter tags = real session types: `lib/category.js` (`categoryOf`, `categoriesFrom`) is the single source for a session's type, used by cards, detail page, and the Home/Catalog filter chips. Chips are derived from the loaded sessions (not hardcoded) so a tag always matches bookable sessions and filters by exact category. Catalog also has an "All" chip + price/date filters.
+- Already-booked state: `lib/use-booked.js` hook fetches the user's booked session IDs; Home/Catalog pass `booked` to `SessionCard` (green non-clickable "✓ Already Booked" replaces Book Now); session detail checks `/bookings/` and shows the same in the price card. Set optimistically after a successful booking.
+- Dashboards keep the global **top navbar + footer** (per request — the mockup's left sidebar is replaced by the existing nav). User dashboard: welcome + live next-session countdown + active/past bookings + a full editable Profile card (avatar upload, display name, username/email read-only, role, save). Creator dashboard: "Your Impact Workspace" + an **Edit Profile button** (→/profile) in place of the avatar/name, real stat cards (Total Attendees = Σ booked_count, Earnings = Σ price×booked_count; Guide Rating shown as "—" since unmodeled), Active Sessions list with Edit/Delete, Upcoming Bookings, and an always-visible Create/Edit Session panel.
+- Seed aligned to theme: `seed_demo` now creates wellness sessions (Meditation/Yoga/Sound Healing/Breathwork + a past one) so the derived categories are meaningful under the Ahoum theme (was dev/tech topics that all fell back to "Session").
+- Verify note: headless Chrome `--window-size=<small>` does NOT emulate a mobile viewport (enforces a min window width → false horizontal-overflow clipping). Use CDP `Emulation.setDeviceMetricsOverride` (mobile=true) for true responsive checks — confirmed scrollWidth==innerWidth==375 on home/catalog/detail.
 (Record every architectural decision here with a one-line reason.)
 
 ## Scoring Map (track what earns points)
-- [~] Architecture & Docker — 20  (scaffold + compose verified booting; features pending)
-- [x] Auth & Roles (OAuth + JWT, enforcement) — 20  (backend + frontend auth flow done; needs live GitHub creds for full e2e)
-- [x] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + all frontend pages done & building)
-- [x] Frontend UX (responsive, error handling) — 15  (responsive design system, loading/error/empty states + toasts throughout; needs live OAuth for full click-through)
-- [ ] Code Quality & Docs (.env.example, README) — 15
+- [x] Architecture & Docker — 20  (fresh `docker-compose up --build` verified: all 5 containers up, endpoints 200)
+- [x] Auth & Roles (OAuth + JWT, enforcement) — 20  (role matrix TESTED — anon 401, USER create/creator-routes 403, non-owner edit/delete 403, booking dup/paid guards 400)
+- [x] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + all pages; redesigned user + creator dashboards)
+- [x] Frontend UX (responsive, error handling) — 15  (Ahoum light theme, toasts, loading/error/empty states; mobile verified via CDP at 375px)
+- [x] Code Quality & Docs (.env.example, README) — 15  (README full setup+OAuth scopes+Razorpay+MinIO+demo flow; .env.example matches all env usage; dead code removed)
 - [x] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)  (all three verified live)
 
 ## Progress Tracker
-Five pages: [x] Home/Catalog  [x] Session Detail  [x] Auth Flow  [x] User Dashboard  [x] Creator Dashboard  (+[x] Profile)
+Five pages: [x] Home  [x] Catalog (search+filters)  [x] Session Detail  [x] Auth Flow  [x] User Dashboard  [x] Creator Dashboard  (+[x] Profile)
+UI redesign (Ahoum light theme): [x] Home  [x] Catalog  [x] Session Detail  [x] User Dashboard  [x] Creator Dashboard  [x] Login ("Choose Your Path")  [x] Profile (themed; also editable from User Dashboard)
 Backend: [x] models  [x] GitHub OAuth+JWT  [x] endpoints  [x] permissions  [x] seed data
 Infra: [x] docker-compose  [x] nginx  [x] MinIO (container+bucket)  [x] .env.example  [x] README
 Bonus: [x] Razorpay payment flow  [x] rate limiting (scoped throttles + shared cache)  [x] MinIO avatar uploads
 
 ## Changelog
+- 2026-06-30 — Final pass: auth page, docs, verification, cleanup.
+  - Login redesigned to the "Choose Your Path" split (left gradient + welcome, right card with User/Creator selectable cards + Continue → GitHub OAuth, JWT note); global navbar on top + footer below. Responsive (stacks on mobile).
+  - Removed dead code: `Notice` (ui.js) and `isExpired` (jwt.js) — both unused.
+  - README completed: Setup, GitHub OAuth (incl. `read:user user:email` scopes + redirect/state flow), Razorpay test-mode, MinIO/bucket + avatar upload, and a concrete end-to-end demo flow (creator signup → create session → avatar upload → user book + Razorpay pay → Already-Booked).
+  - `.env.example` cross-checked against every `env()`/compose var — complete, no missing keys.
+  - VERIFIED FRESH (`down -v` → `up --build`): all 5 containers up (db+minio healthy), `/`,`/api/health`,`/api/sessions/` 200, `/admin/` 302, MinIO console 200, seed = 5 sessions.
+  - ROLE ENFORCEMENT TESTED (curl matrix): anon → 401 on create/book/me/creator/payments; USER → 403 on create + creator/bookings, 200 on own /me; CREATOR → 201 create, 200 own edit, 403 editing/deleting another creator's session; booking → paid direct-book 400, free 201, double-book 400.
+- 2026-06-30 — Dashboards redesign + Already-Booked state.
+  - Already-booked: `lib/use-booked.js`; `SessionCard` `booked` prop → green "✓ Already Booked" (non-clickable); wired on Home + Catalog; session detail price card shows it too. VERIFIED: as demo_user, the 2 booked sessions show the badge on catalog; detail of a booked session shows it; others show Book Now.
+  - User Dashboard rebuilt: welcome header + live countdown (`NextSessionCard`), Active/Past bookings (cancel/details/book-again), and an editable Profile card (avatar upload + name/role save, username/email read-only) — all under the existing top navbar.
+  - Creator Dashboard rebuilt: eyebrow + "Your Impact Workspace", "Edit Profile" button replacing avatar/name, real stat cards (attendees/earnings; rating "—"), Active Sessions (Edit/Delete), Upcoming Bookings, always-on Create/Edit Session panel.
+  - CSS for booked button + dashboard layouts (`.dash-grid`, `.next-card`, `.bk-card`, `.stat-card`, etc.) with responsive stacking.
+  - VERIFIED (CDP, authed via injected localStorage tokens): both dashboards render correctly at 1280px and stack with zero overflow at 390px.
+- 2026-06-30 — Filter tags derived from real sessions.
+  - New `lib/category.js` (`categoryOf`/`categoriesFrom`); SessionCard + detail page now use it. Home hero chips and Catalog chips are built from the actual sessions' categories (no longer a hardcoded list) and filter by exact category. Catalog gained an "All" chip (`.chips-left`).
+  - Reworked `seed_demo` to wellness sessions (Meditation/Yoga/Sound Healing/Breathwork + past) so tags are meaningful and match the Ahoum theme.
+  - VERIFIED on reseeded stack: 5 sessions with correct category pills; catalog chips = All/Meditation/Yoga/Sound Healing/Breathwork; clicking Yoga → 1 card, Sound Healing → 1 card (CDP click test); card pills match selected tag.
+- 2026-06-30 — UI redesign (Ahoum): light theme, Home/Catalog split, session detail.
+  - New light design system in `globals.css` (Ahoum brand, Poppins/Space Mono/Inter via Google Fonts @import); Navbar → Home + Catalog (+Dashboard/Creator); footer = Ahoum + link row (unchanged, shared).
+  - Home (`/`): hero (heading/search/category chips) + 6 featured cards; "View All" → `/catalog`. New `SessionCard` (gradient image + date badge, category pill, price, creator chip, Book Now → detail).
+  - New `/catalog` page: all sessions + search + price filter + date/price sort + result count.
+  - Session detail redesigned to the mockup: hero banner, info cards, About, What-to-Expect, Upcoming Times, sticky price + creator sidebar; booking/payment flow preserved; "View Full Calendar"/"View Profile" removed.
+  - Fixes: cssnano strips `min-width:0` → used `overflow:hidden` for flex-shrink on search input; `overflow-x:hidden` guard.
+  - VERIFIED: frontend builds (10/10 routes); `/`,`/catalog`,`/sessions/[id]` → 200; wiring (View All→/catalog, nav Home, filters) present in bundle; screenshots match mockups (desktop) and CDP mobile emulation (375px) shows zero horizontal overflow on all three pages.
 - 2026-06-30 — Bonus features: Razorpay payments, rate limiting, MinIO avatar uploads.
   - Razorpay: `catalog/payments.py` (order + verify views, throttled); `Booking` gains `razorpay_order_id`/`razorpay_payment_id` (migration 0002); serializer blocks direct booking of paid sessions; frontend `lib/razorpay.js` loader + session-detail "Pay & Book" → Checkout → verify; test-card hint. `setuptools` added to requirements (razorpay needs pkg_resources).
   - Rate limiting: `accounts/throttles.AuthThrottle` (20/min) on OAuth views; `catalog/throttles.BookingThrottle` (30/min) on booking-create + payments; settings `auth`/`booking` scopes; **Postgres DatabaseCache** added (`createcachetable` in entrypoint) so throttle counts are shared across gunicorn workers.

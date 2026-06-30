@@ -1,13 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import Protected from "../../components/Protected";
 import SessionForm from "../../components/SessionForm";
 import { EmptyState, ErrorMessage, Loading } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
+import { categoryOf } from "../../lib/category";
 import { formatDate, formatPrice } from "../../lib/format";
 import { useToast } from "../../lib/toast-context";
+
+function StatCard({ icon, label, value, trend, note }) {
+  return (
+    <div className="stat-card">
+      <div className="stat-top">
+        <span className="stat-ic">{icon}</span>
+        {trend && <span className="stat-trend">↑ {trend}</span>}
+        {note && <span className="stat-note">{note}</span>}
+      </div>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">{value}</div>
+    </div>
+  );
+}
 
 function CreatorInner() {
   const toast = useToast();
@@ -16,7 +32,6 @@ function CreatorInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -42,32 +57,18 @@ function CreatorInner() {
     load();
   }, []);
 
-  const openCreate = () => {
-    setEditing(null);
-    setFormError(null);
-    setShowForm(true);
-  };
-  const openEdit = (s) => {
-    setEditing(s);
-    setFormError(null);
-    setShowForm(true);
-  };
-
   const submit = async (data) => {
     setSubmitting(true);
     setFormError(null);
     try {
       if (editing) {
-        await apiFetch(`/sessions/${editing.id}/`, {
-          method: "PATCH",
-          body: data,
-        });
+        await apiFetch(`/sessions/${editing.id}/`, { method: "PATCH", body: data });
         toast.success("Session updated.");
       } else {
         await apiFetch("/sessions/", { method: "POST", body: data });
         toast.success("Session created.");
       }
-      setShowForm(false);
+      setEditing(null);
       await load();
     } catch (e) {
       setFormError(e.message);
@@ -82,35 +83,31 @@ function CreatorInner() {
     try {
       await apiFetch(`/sessions/${id}/`, { method: "DELETE" });
       setSessions((ss) => ss.filter((s) => s.id !== id));
+      if (editing?.id === id) setEditing(null);
       toast.success("Session deleted.");
     } catch (e) {
       toast.error(e.message);
     }
   };
 
+  // Stats from real data.
+  const attendees = sessions.reduce((n, s) => n + (s.booked_count || 0), 0);
+  const earnings = sessions.reduce(
+    (n, s) => n + Number(s.price) * (s.booked_count || 0),
+    0
+  );
+
   return (
     <div className="container">
-      <div className="page-head">
-        <h1>Creator Dashboard</h1>
-        {!showForm && (
-          <button className="btn primary" onClick={openCreate}>
-            + New session
-          </button>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="card form-card">
-          <h2>{editing ? "Edit session" : "Create a session"}</h2>
-          <SessionForm
-            initial={editing}
-            onSubmit={submit}
-            onCancel={() => setShowForm(false)}
-            submitting={submitting}
-            error={formError}
-          />
+      <div className="dash-top">
+        <div>
+          <span className="eyebrow">Creator Overview</span>
+          <h1>Your Impact Workspace</h1>
         </div>
-      )}
+        <Link href="/profile" className="btn ghost">
+          Edit Profile
+        </Link>
+      </div>
 
       {loading ? (
         <Loading label="Loading your dashboard…" />
@@ -118,69 +115,126 @@ function CreatorInner() {
         <ErrorMessage>{error}</ErrorMessage>
       ) : (
         <>
-          <h2 className="section-title">My sessions ({sessions.length})</h2>
-          {sessions.length === 0 ? (
-            <EmptyState title="No sessions yet">
-              Create your first session to start taking bookings.
-            </EmptyState>
-          ) : (
-            <div className="table sessions">
-              <div className="thead">
-                <span>Title</span>
-                <span>When</span>
-                <span>Price</span>
-                <span>Booked</span>
-                <span />
-              </div>
-              {sessions.map((s) => (
-                <div key={s.id} className="trow">
-                  <span>{s.title}</span>
-                  <span>{formatDate(s.datetime)}</span>
-                  <span>{formatPrice(s.price)}</span>
-                  <span>
-                    {s.booked_count}/{s.capacity}
-                  </span>
-                  <span className="cell-actions">
-                    <button className="btn ghost sm" onClick={() => openEdit(s)}>
-                      Edit
-                    </button>
-                    <button
-                      className="btn danger sm"
-                      onClick={() => remove(s.id)}
-                    >
-                      Delete
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="stats">
+            <StatCard
+              icon="👥"
+              label="Total Attendees"
+              value={attendees.toLocaleString()}
+            />
+            <StatCard
+              icon="⭐"
+              label="Guide Rating"
+              value={
+                <>
+                  — <small>/ 5.0</small>
+                </>
+              }
+              note="No ratings yet"
+            />
+            <StatCard
+              icon="💳"
+              label="Earnings (booked)"
+              value={formatPrice(earnings)}
+            />
+          </div>
 
-          <h2 className="section-title">
-            Bookings on my sessions ({bookings.length})
-          </h2>
-          {bookings.length === 0 ? (
-            <p className="muted">No one has booked yet.</p>
-          ) : (
-            <div className="table">
-              <div className="thead">
-                <span>Attendee</span>
-                <span>Session</span>
-                <span>When</span>
-                <span>Status</span>
-              </div>
-              {bookings.map((b) => (
-                <div key={b.id} className="trow">
-                  <span>{b.user_name || b.user_username}</span>
-                  <span>{b.session_title}</span>
-                  <span>{formatDate(b.session_datetime)}</span>
-                  <span className={`pill ${b.is_past ? "muted-pill" : "ok"}`}>
-                    {b.is_past ? "Past" : "Upcoming"}
-                  </span>
+          <div className="dash-grid">
+            <div className="dash-main">
+              <div className="card">
+                <div className="panel-head">
+                  <h2>Active Sessions</h2>
+                  <span className="muted">{sessions.length} total</span>
                 </div>
-              ))}
+                {sessions.length === 0 ? (
+                  <EmptyState title="No sessions yet">
+                    Create your first session in the panel on the right.
+                  </EmptyState>
+                ) : (
+                  <div className="list">
+                    {sessions.map((s) => (
+                      <div key={s.id} className="row">
+                        <div className="grow">
+                          <div className="bk-top" style={{ marginBottom: "0.3rem" }}>
+                            <span className="cat-pill">{categoryOf(s)}</span>
+                            <span className="bk-time">{formatPrice(s.price)}</span>
+                          </div>
+                          <h4 style={{ margin: 0 }}>{s.title}</h4>
+                          <div className="sub muted">
+                            Next: {formatDate(s.datetime)} · {s.booked_count}/
+                            {s.capacity} booked
+                          </div>
+                        </div>
+                        <div className="row-actions">
+                          <button
+                            className="btn ghost sm"
+                            onClick={() => {
+                              setEditing(s);
+                              setFormError(null);
+                              if (typeof window !== "undefined")
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn danger sm"
+                            onClick={() => remove(s.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="card" style={{ marginTop: "1.25rem" }}>
+                <div className="panel-head">
+                  <h2>Upcoming Bookings</h2>
+                  <span className="muted">{bookings.length} total</span>
+                </div>
+                {bookings.length === 0 ? (
+                  <p className="muted">No one has booked yet.</p>
+                ) : (
+                  <div className="list">
+                    {bookings.map((b) => (
+                      <div key={b.id} className="row">
+                        <div className="grow">
+                          <h4 style={{ margin: 0 }}>
+                            {b.user_name || b.user_username}
+                          </h4>
+                          <div className="sub muted">{b.session_title}</div>
+                        </div>
+                        <span className={`pill ${b.is_past ? "muted-pill" : "ok"}`}>
+                          {formatDate(b.session_datetime)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+
+            <aside className="dash-side">
+              <div className="card create-panel">
+                <h2>{editing ? "Edit Session" : "Create Session"}</h2>
+                <p className="muted" style={{ marginTop: "-0.2rem" }}>
+                  {editing
+                    ? "Update your sanctuary experience."
+                    : "Draft a new sanctuary experience."}
+                </p>
+                <SessionForm
+                  key={editing ? editing.id : "new"}
+                  initial={editing}
+                  onSubmit={submit}
+                  onCancel={() => setEditing(null)}
+                  submitting={submitting}
+                  error={formError}
+                />
+              </div>
+            </aside>
+          </div>
         </>
       )}
     </div>

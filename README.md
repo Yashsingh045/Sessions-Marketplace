@@ -85,9 +85,16 @@ To stop: `Ctrl+C`, then `docker-compose down` (add `-v` to wipe data volumes).
    ```
 5. Restart: `docker-compose up --build`.
 
-**Flow (once implemented):** browser → GitHub authorize → GitHub redirects to the
-callback → backend exchanges the code for a GitHub token, fetches the profile,
-upserts the user, and issues its own **JWT** to the frontend.
+**Scopes:** the backend requests `read:user user:email` (to read the GitHub
+profile and primary email). GitHub OAuth Apps don't pre-declare scopes — the
+backend passes them in the authorize request automatically; no config needed.
+
+**Flow:** browser → GitHub authorize → GitHub redirects to the callback →
+backend exchanges the code for a GitHub token, fetches the profile + email,
+upserts the user, issues its own **JWT**, and redirects to the frontend
+`/auth/callback#access=…&refresh=…` (tokens in the URL fragment, stored in
+localStorage). The role chosen on the login screen is carried through OAuth
+`state` so a brand-new user is created as USER or CREATOR accordingly.
 
 ---
 
@@ -132,15 +139,32 @@ Both payment endpoints (and direct booking creation) are rate-limited
 
 ---
 
-## Demo flow (target)
+## Demo flow
 
-1. Open http://localhost — browse the **session catalog**.
-2. Click a session for the **detail page**.
-3. **Sign in with GitHub** — backend issues a JWT.
-4. As a **User**: book a session → pay via **Razorpay (test mode)** → see it in
-   your **User Dashboard**.
-5. As a **Creator**: create/edit sessions, upload an **avatar** (stored in
-   MinIO), and manage bookings from the **Creator Dashboard**.
+With `SEED_DEMO_DATA=True` the catalog is pre-populated with wellness sessions on
+first start, so you can browse immediately. Full end-to-end walkthrough:
+
+1. **Browse** — open http://localhost. The **Home** page shows featured sessions
+   with category tags; **Catalog** (top nav) lists all sessions with search +
+   price/date filters.
+2. **Sign in as a Creator** — top-right **Sign In** → "Choose Your Path" →
+   select **Creator** → **Continue** → authorize on GitHub. You land on the
+   **Creator Dashboard** ("Your Impact Workspace").
+3. **Create a session** — in the **Create Session** panel fill Title, Date &
+   time, Capacity and Price (set a non-zero price to exercise payment) → **Save
+   session**. It appears in *Active Sessions* and on the public catalog.
+4. **Upload an avatar** — click **Edit Profile** (or open **Profile**) → **Upload
+   avatar** → pick an image. It's stored in **MinIO** and shown across the app.
+5. **Sign in as a User** (separate GitHub account or sign out and re-pick
+   **User**) — open the session from the catalog → **Book Now**.
+   - **Free** session → booked instantly.
+   - **Paid** session → **Razorpay Checkout** opens; pay with test card
+     `4111 1111 1111 1111` (any future expiry/CVV). The backend verifies the
+     signature, then confirms the booking.
+6. **Confirm** — the session now shows a green **✓ Already Booked** badge on the
+   catalog and detail page, and appears under **Dashboard → Active Bookings**
+   (with a live next-session countdown). The Creator sees the attendee under
+   **Upcoming Bookings**.
 
 ---
 
