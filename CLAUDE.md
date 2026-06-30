@@ -39,18 +39,23 @@
 - Creator overview: `GET /api/creator/bookings/` (CREATOR-only via `IsCreatorRole`) lists bookings across the creator's sessions with booker identity (`CreatorBookingSerializer`); supports `?session=<id>`.
 - Booking temporal flag: `Booking.is_past` derived from `session.datetime` (accurate regardless of stored `status`); user bookings support `?status=ACTIVE|PAST`.
 - Demo seeding: idempotent `seed_demo` mgmt command (1 CREATOR, 1 USER, 4 sessions incl. one past + 2 bookings); auto-runs on container start when `SEED_DEMO_DATA=true`.
+- Frontend structure: app-router, every page `"use client"`; `lib/` (config, jwt decode, api wrapper, auth-context, format) + `components/` (Navbar, SessionCard, SessionForm, Protected, ui primitives) + pages. No CSS framework — hand-written design system in `globals.css` (CSS variables, dark theme, responsive grid) to keep the Docker build dependency-free.
+- Auth context: hydrates from localStorage token by calling `/api/me/` (authoritative role from DB, not just the token claim — so a role change takes effect without re-login); exposes `user/role/isAuthenticated/isCreator/login/logout/applyUser`.
+- API wrapper (`lib/api.js`): attaches Bearer token, on 401 does a single silent `/auth/token/refresh/` then retries; on refresh failure clears tokens + fires auth-failure handler; normalizes DRF error shapes (`detail`/`non_field_errors`/field errors) to a message.
+- Route protection: `<Protected role?>` client guard redirects unauthenticated → `/login`, wrong-role → `/`. Creator pages gated on `role==='CREATOR'`.
+- OAuth callback: `/auth/callback` reads tokens from the URL **fragment**, stores them, scrubs the URL via `history.replaceState`, routes by role (CREATOR→/creator, USER→/dashboard).
 (Record every architectural decision here with a one-line reason.)
 
 ## Scoring Map (track what earns points)
 - [~] Architecture & Docker — 20  (scaffold + compose verified booting; features pending)
-- [~] Auth & Roles (OAuth + JWT, enforcement) — 20  (backend done + verified; frontend auth UI pending)
-- [~] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + seed done & verified; frontend pages pending)
-- [ ] Frontend UX (responsive, error handling) — 15
+- [x] Auth & Roles (OAuth + JWT, enforcement) — 20  (backend + frontend auth flow done; needs live GitHub creds for full e2e)
+- [x] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + all frontend pages done & building)
+- [~] Frontend UX (responsive, error handling) — 15  (responsive design system, loading/error/empty states throughout; pending real-data polish)
 - [ ] Code Quality & Docs (.env.example, README) — 15
 - [ ] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)
 
 ## Progress Tracker
-Five pages: [ ] Home/Catalog  [ ] Session Detail  [ ] Auth Flow  [ ] User Dashboard  [ ] Creator Dashboard
+Five pages: [x] Home/Catalog  [x] Session Detail  [x] Auth Flow  [x] User Dashboard  [x] Creator Dashboard  (+[x] Profile)
 Backend: [x] models  [x] GitHub OAuth+JWT  [x] endpoints  [x] permissions  [x] seed data
 Infra: [x] docker-compose  [x] nginx  [x] MinIO (container+bucket)  [x] .env.example  [x] README
 Bonus: [ ] Razorpay payment flow  [~] rate limiting (DRF throttles wired, scopes TBD)  [ ] MinIO avatar uploads

@@ -1,20 +1,65 @@
 "use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+
+import SessionCard from "../components/SessionCard";
+import { EmptyState, ErrorMessage, Loading } from "../components/ui";
+import { apiFetch } from "../lib/api";
+
+export default function HomePage() {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/sessions/", { auth: false })
+      .then((data) => active && setSessions(data))
+      .catch((e) => active && setError(e.message))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? sessions.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          (s.description || "").toLowerCase().includes(q)
+      )
+    : sessions;
+
   return (
-    <main style={{ padding: "3rem", maxWidth: 720, margin: "0 auto" }}>
-      <h1>Sessions Marketplace</h1>
-      <p>Scaffold is up. Feature pages coming next:</p>
-      <ul>
-        <li>Home / Catalog</li>
-        <li>Session Detail</li>
-        <li>Auth Flow (GitHub OAuth)</li>
-        <li>User Dashboard</li>
-        <li>Creator Dashboard</li>
-      </ul>
-      <p style={{ color: "#666" }}>
-        API base: <code>{process.env.NEXT_PUBLIC_API_BASE_URL || "(unset)"}</code>
-      </p>
-    </main>
+    <div className="container">
+      <section className="hero">
+        <h1>Find your next live session</h1>
+        <p className="muted">Learn from creators. Book a seat in seconds.</p>
+        <input
+          className="search"
+          placeholder="Search sessions…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </section>
+
+      {loading ? (
+        <Loading label="Loading catalog…" />
+      ) : error ? (
+        <ErrorMessage>{error}</ErrorMessage>
+      ) : filtered.length === 0 ? (
+        <EmptyState title="No sessions found">
+          {q ? "Try a different search." : "Check back soon for new sessions."}
+        </EmptyState>
+      ) : (
+        <div className="grid">
+          {filtered.map((s) => (
+            <SessionCard key={s.id} session={s} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
