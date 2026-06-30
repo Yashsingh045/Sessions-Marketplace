@@ -11,4 +11,5 @@ urlpatterns = [
     path("auth/me/", views.me, name="me"),
     # Spec-required short alias for the profile endpoint.
     path("me/", views.me, name="me-short"),
+    path("me/avatar/", views.upload_avatar, name="me-avatar"),
 ]

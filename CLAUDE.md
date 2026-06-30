@@ -46,6 +46,10 @@
 - OAuth callback: `/auth/callback` reads tokens from the URL **fragment**, stores them, scrubs the URL via `history.replaceState`, routes by role (CREATOR→/creator, USER→/dashboard).
 - Toasts: app-wide `ToastProvider`/`useToast` (fixed bottom-right, auto-dismiss ~3.8s, ok/error/info, click-to-close) wrapping the tree above AuthProvider; all mutations (book, cancel, session create/edit/delete, profile save) report via toast. Inline alerts kept only for in-form/load errors.
 - Page polish: Home shows a login CTA banner when logged out; User Dashboard leads with a profile summary card (avatar/name/email/role + Edit link); Creator "My sessions" is a responsive CRUD table (Title/When/Price/Booked/Actions).
+- Razorpay (bonus): paid sessions require a verified payment. `POST /api/payments/order/` creates a Razorpay order; checkout opens client-side; `POST /api/payments/verify/` verifies the signature server-side (`client.utility.verify_payment_signature`) then creates the booking with order/payment IDs. Free sessions (price 0) book directly via `/api/bookings/`; the booking serializer now rejects direct booking of paid sessions. `setuptools` pinned in requirements because razorpay 1.4.x imports `pkg_resources` (absent in py3.12-slim).
+- Rate limiting (bonus): scoped throttles — `AuthThrottle` (anon, scope `auth`, 20/min) on the 3 OAuth views; `BookingThrottle` (user, scope `booking`, 30/min) on booking-create + both payment endpoints. Requires a **shared cache** so counts don't fragment across gunicorn workers → Postgres `DatabaseCache` (table `throttle_cache`, created on startup); chosen over adding a Redis container.
+- MinIO uploads (bonus): `POST /api/me/avatar/` (multipart) saves to django-storages S3 at key `user_<id>/avatar.<ext>` (file_overwrite), stores the public URL on the user. Needs `AWS_S3_ADDRESSING_STYLE=path` (MinIO) + `AWS_S3_URL_PROTOCOL=http:` + custom domain `localhost:9000/avatars`; bucket made public-download by `minio-init`. `apiFetch` detects `FormData` and skips the JSON content-type.
+- Op note: nginx resolves `backend`/`frontend` upstream IPs at startup — restarting a single app container (new IP) makes nginx 502 until nginx is also restarted. Not an issue for `docker-compose up --build` (all start together); restart nginx after restarting one service.
 (Record every architectural decision here with a one-line reason.)
 
 ## Scoring Map (track what earns points)
@@ -54,15 +58,21 @@
 - [x] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + all frontend pages done & building)
 - [x] Frontend UX (responsive, error handling) — 15  (responsive design system, loading/error/empty states + toasts throughout; needs live OAuth for full click-through)
 - [ ] Code Quality & Docs (.env.example, README) — 15
-- [ ] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)
+- [x] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)  (all three verified live)
 
 ## Progress Tracker
 Five pages: [x] Home/Catalog  [x] Session Detail  [x] Auth Flow  [x] User Dashboard  [x] Creator Dashboard  (+[x] Profile)
 Backend: [x] models  [x] GitHub OAuth+JWT  [x] endpoints  [x] permissions  [x] seed data
 Infra: [x] docker-compose  [x] nginx  [x] MinIO (container+bucket)  [x] .env.example  [x] README
-Bonus: [ ] Razorpay payment flow  [~] rate limiting (DRF throttles wired, scopes TBD)  [ ] MinIO avatar uploads
+Bonus: [x] Razorpay payment flow  [x] rate limiting (scoped throttles + shared cache)  [x] MinIO avatar uploads
 
 ## Changelog
+- 2026-06-30 — Bonus features: Razorpay payments, rate limiting, MinIO avatar uploads.
+  - Razorpay: `catalog/payments.py` (order + verify views, throttled); `Booking` gains `razorpay_order_id`/`razorpay_payment_id` (migration 0002); serializer blocks direct booking of paid sessions; frontend `lib/razorpay.js` loader + session-detail "Pay & Book" → Checkout → verify; test-card hint. `setuptools` added to requirements (razorpay needs pkg_resources).
+  - Rate limiting: `accounts/throttles.AuthThrottle` (20/min) on OAuth views; `catalog/throttles.BookingThrottle` (30/min) on booking-create + payments; settings `auth`/`booking` scopes; **Postgres DatabaseCache** added (`createcachetable` in entrypoint) so throttle counts are shared across gunicorn workers.
+  - MinIO: `POST /api/me/avatar/` upload view (validates type ≤5MB, key `user_<id>/avatar.<ext>`); settings `AWS_S3_ADDRESSING_STYLE=path` + `AWS_S3_URL_PROTOCOL=http:`; `apiFetch` FormData support; Profile page "Upload avatar" file input.
+  - Docs: `.env.example` (+AWS addressing/protocol, +THROTTLE_AUTH/BOOKING); README (MinIO upload details + new Razorpay section + test card).
+  - VERIFIED live on the stack: Razorpay order created via REAL test keys (order_T7iOJhPoZXMKdh, ₹999→99900 paise); bad signature → 400; paid direct-book → blocked. Auth throttle: 20×200 then 4×429. Avatar upload → stored at `avatars/user_2/avatar.png`, public URL returns 200 image/png, invalid type → 400. Frontend builds clean (9/9).
 - 2026-06-30 — Page polish vs API: toasts, login CTA, dashboard profile section, creator table.
   - New `lib/toast-context.js` (ToastProvider/useToast); wired into `layout.js` above AuthProvider; toast styles in `globals.css`.
   - Home: login CTA banner when logged out. Session detail: book → success/error toast (replaced inline notice), "Book Now" label. User Dashboard: profile summary card (avatar/name/email/role + Edit) above bookings; cancel → toast. Creator: My-sessions rendered as responsive CRUD table (Title/When/Price/Booked/Actions); create/edit/delete → toasts. Profile: save → toast (replaced inline message).

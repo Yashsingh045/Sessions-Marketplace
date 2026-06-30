@@ -13,6 +13,7 @@ function ProfileInner() {
   const toast = useToast();
   const [form, setForm] = useState({ name: "", avatar: "", role: "USER" });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -23,6 +24,28 @@ function ProfileInner() {
       });
     }
   }, [user]);
+
+  const onAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setUploading(true);
+    try {
+      const data = new FormData();
+      data.append("avatar", file);
+      const updated = await apiFetch("/me/avatar/", {
+        method: "POST",
+        body: data,
+      });
+      applyUser(updated);
+      setForm((f) => ({ ...f, avatar: updated.avatar || "" }));
+      toast.success("Avatar uploaded.");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -57,6 +80,18 @@ function ProfileInner() {
             <h2>{user.username}</h2>
             <p className="muted">{user.email || "No email on file"}</p>
             <span className="badge">{user.role}</span>
+            <div style={{ marginTop: "0.6rem" }}>
+              <label className="btn ghost sm" style={{ cursor: "pointer" }}>
+                {uploading ? "Uploading…" : "Upload avatar"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  hidden
+                  disabled={uploading}
+                  onChange={onAvatarFile}
+                />
+              </label>
+            </div>
           </div>
         </div>
 

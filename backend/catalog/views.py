@@ -7,6 +7,7 @@ from .serializers import (
     CreatorBookingSerializer,
     SessionSerializer,
 )
+from .throttles import BookingThrottle
 
 
 class SessionViewSet(viewsets.ModelViewSet):
@@ -35,6 +36,12 @@ class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def get_throttles(self):
+        # Only throttle booking creation (the sensitive write), not reads.
+        if self.action == "create":
+            return [BookingThrottle()]
+        return super().get_throttles()
 
     def get_queryset(self):
         qs = (

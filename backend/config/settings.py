@@ -97,6 +97,16 @@ DATABASES = {
     }
 }
 
+# Shared cache so DRF rate-limit counters are consistent across gunicorn
+# workers (a per-process LocMemCache would let each worker count separately).
+# Postgres-backed avoids adding a Redis container; created on startup.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "throttle_cache",
+    }
+}
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -145,6 +155,10 @@ if USE_S3:
     AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN") or None
     AWS_QUERYSTRING_AUTH = env_bool("AWS_QUERYSTRING_AUTH", False)
     AWS_DEFAULT_ACL = None
+    # MinIO needs path-style addressing (bucket in the path, not the host).
+    AWS_S3_ADDRESSING_STYLE = env("AWS_S3_ADDRESSING_STYLE", "path")
+    # Protocol used when building public object URLs (http for local MinIO).
+    AWS_S3_URL_PROTOCOL = env("AWS_S3_URL_PROTOCOL", "http:")
 
 # --------------------------------------------------------------------------- #
 # Django REST Framework + SimpleJWT
@@ -164,6 +178,9 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": env("THROTTLE_ANON", "60/min"),
         "user": env("THROTTLE_USER", "120/min"),
+        # Tighter scopes for sensitive endpoints (bonus: rate limiting).
+        "auth": env("THROTTLE_AUTH", "20/min"),
+        "booking": env("THROTTLE_BOOKING", "30/min"),
     },
 }
 

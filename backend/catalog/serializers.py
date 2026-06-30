@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import Booking, Session
@@ -53,6 +55,11 @@ class BookingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("You have already booked this session.")
         if session.seats_left <= 0:
             raise serializers.ValidationError("This session is fully booked.")
+        # Paid sessions must complete the Razorpay flow (see /api/payments/).
+        if Decimal(session.price) > 0:
+            raise serializers.ValidationError(
+                "This is a paid session — please complete payment to book."
+            )
         return attrs
 
 

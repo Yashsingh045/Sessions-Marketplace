@@ -95,14 +95,40 @@ upserts the user, and issues its own **JWT** to the frontend.
 
 MinIO runs as a container and the `minio-init` one-shot service **creates the
 bucket automatically** on first `up` (named by `MINIO_BUCKET`, default `avatars`)
-and makes it publicly readable for avatar display.
+and makes it publicly readable for avatar display — no manual steps needed.
 
 - Console: http://localhost:9001 (log in with `MINIO_ROOT_USER` /
   `MINIO_ROOT_PASSWORD`).
-- The backend talks to MinIO over the internal network at
-  `AWS_S3_ENDPOINT_URL=http://minio:9000` using `django-storages`.
-- To use a real S3 bucket instead, point `AWS_*` vars at AWS and set
-  `AWS_S3_ENDPOINT_URL` to empty / the AWS endpoint.
+- The backend writes uploads via `django-storages` + `boto3` over the internal
+  network at `AWS_S3_ENDPOINT_URL=http://minio:9000`, using **path-style**
+  addressing (`AWS_S3_ADDRESSING_STYLE=path`, required by MinIO).
+- Public object URLs are built from `AWS_S3_CUSTOM_DOMAIN=localhost:9000/avatars`
+  with `AWS_S3_URL_PROTOCOL=http:`, so the browser can load avatars directly.
+- **Avatar upload:** Profile page → "Upload avatar" → `POST /api/me/avatar/`
+  (multipart). The backend stores the file at key `user_<id>/avatar.<ext>` in the
+  bucket and saves the resulting URL on the user (overwrites on re-upload).
+- To use real AWS S3 instead, point the `AWS_*` vars at AWS, set
+  `AWS_S3_ENDPOINT_URL` empty, `AWS_S3_URL_PROTOCOL=https:`, and drop the
+  path-style override.
+
+---
+
+## Razorpay (test mode) payments
+
+Paid sessions require a verified Razorpay payment before the booking is
+confirmed; free sessions (price 0) are booked directly.
+
+1. Get **test** keys from the Razorpay Dashboard → Settings → API Keys (Test
+   Mode) and set `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` in `.env`.
+2. Flow: frontend calls `POST /api/payments/order/` → backend creates a Razorpay
+   order → Razorpay Checkout opens in the browser → on success the frontend calls
+   `POST /api/payments/verify/`, where the backend **verifies the payment
+   signature** and only then creates the booking (storing the order/payment IDs).
+3. Test card: `4111 1111 1111 1111`, any future expiry, any CVV, any name.
+
+Both payment endpoints (and direct booking creation) are rate-limited
+(`THROTTLE_BOOKING`, default 30/min); the OAuth endpoints use `THROTTLE_AUTH`
+(default 20/min).
 
 ---
 

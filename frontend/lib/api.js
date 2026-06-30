@@ -73,8 +73,10 @@ export async function apiFetch(
   path,
   { method = "GET", body, auth = true, _retry = false } = {}
 ) {
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   const headers = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // For FormData, let the browser set the multipart Content-Type + boundary.
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (auth && tokenStore.access) {
     headers["Authorization"] = `Bearer ${tokenStore.access}`;
   }
@@ -82,7 +84,8 @@ export async function apiFetch(
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
 
   // Token expired → try a single silent refresh, then retry the request.

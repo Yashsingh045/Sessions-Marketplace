@@ -10,6 +10,7 @@ done
 echo "Postgres is up."
 
 python manage.py migrate --noinput
+python manage.py createcachetable || true
 python manage.py collectstatic --noinput || true
 
 # Optional demo seed (idempotent). Toggle with SEED_DEMO_DATA in .env.

@@ -8,3 +8,5 @@ psycopg2-binary==2.9.9
 gunicorn==22.0.0
 requests==2.32.3
 razorpay==1.4.2
+# razorpay 1.4.x imports pkg_resources, absent from Python 3.12-slim.
+setuptools==70.3.0

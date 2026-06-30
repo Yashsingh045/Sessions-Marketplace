@@ -11,17 +11,26 @@ Two entry points share one exchange routine:
 
   GET/PATCH /api/auth/me/           → current user; PATCH updates name/avatar/role
 """
+import os
 from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.storage import default_storage
 from django.shortcuts import redirect
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    parser_classes,
+    permission_classes,
+    throttle_classes,
+)
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .serializers import UserSerializer
+from .throttles import AuthThrottle
 from .tokens import get_tokens_for_user
 
 User = get_user_model()
@@ -85,6 +94,7 @@ def _exchange_code_for_user(code, intended_role=None):
 
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([AuthThrottle])
 def github_login(request):
     """Build the GitHub authorize URL. Optional ?role=CREATOR is round-tripped
     via `state` so a brand-new user can be created as a CREATOR."""
@@ -102,6 +112,7 @@ def github_login(request):
 
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([AuthThrottle])
 def github_callback(request):
     code = request.query_params.get("code")
     state = request.query_params.get("state", "")
@@ -120,6 +131,7 @@ def github_callback(request):
 
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([AuthThrottle])
 def github_exchange(request):
     """SPA-friendly: frontend handles the GitHub redirect, then POSTs the code
     here and receives the JWT pair as JSON (no tokens in the URL)."""
@@ -143,4 +155,40 @@ def me(request):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+    return Response(UserSerializer(request.user).data)
+
+
+ALLOWED_AVATAR_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def upload_avatar(request):
+    """Store an uploaded avatar in MinIO (via django-storages) and save the
+    resulting public object URL on the user."""
+    file = request.FILES.get("avatar")
+    if not file:
+        return Response(
+            {"detail": "No file provided (expected form field 'avatar')."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if file.size > MAX_AVATAR_BYTES:
+        return Response(
+            {"detail": "File too large (max 5 MB)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in ALLOWED_AVATAR_EXTS:
+        return Response(
+            {"detail": "Unsupported file type. Use PNG, JPG, GIF or WEBP."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # S3Storage.file_overwrite defaults True → a stable key per user.
+    key = f"user_{request.user.id}/avatar{ext}"
+    saved_name = default_storage.save(key, file)
+    request.user.avatar = default_storage.url(saved_name)
+    request.user.save(update_fields=["avatar"])
     return Response(UserSerializer(request.user).data)
