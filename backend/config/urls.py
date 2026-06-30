@@ -5,7 +5,7 @@ Only a health-check endpoint exists at this scaffold stage. Feature routers
 """
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import path
+from django.urls import include, path
 
 
 def health(_request):
@@ -16,4 +16,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health, name="health"),
     path("api/health", health),
+    path("api/", include("accounts.urls")),
+    path("api/", include("catalog.urls")),
 ]

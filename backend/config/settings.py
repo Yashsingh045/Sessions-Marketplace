@@ -45,8 +45,12 @@ INSTALLED_APPS = [
     # Third party
     "rest_framework",
     "corsheaders",
-    # Local apps are registered here as features land.
+    # Local apps
+    "accounts",
+    "catalog",
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -188,6 +192,9 @@ CORS_ALLOW_CREDENTIALS = True
 GITHUB_OAUTH_CLIENT_ID = env("GITHUB_OAUTH_CLIENT_ID", "")
 GITHUB_OAUTH_CLIENT_SECRET = env("GITHUB_OAUTH_CLIENT_SECRET", "")
 GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", "")
+
+# Where the OAuth callback redirects the browser back to (frontend SPA).
+FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", "http://localhost")
 
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", "")
