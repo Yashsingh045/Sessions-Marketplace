@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 
 import Protected from "../../components/Protected";
-import { ErrorMessage, Loading, Notice } from "../../components/ui";
+import { Loading } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
+import { useToast } from "../../lib/toast-context";
 
 function ProfileInner() {
   const { user, applyUser } = useAuth();
+  const toast = useToast();
   const [form, setForm] = useState({ name: "", avatar: "", role: "USER" });
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -27,14 +27,12 @@ function ProfileInner() {
   const save = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
-    setError(null);
     try {
       const updated = await apiFetch("/me/", { method: "PATCH", body: form });
       applyUser(updated); // syncs user + role (e.g. USER → CREATOR)
-      setMessage("Profile updated.");
+      toast.success("Profile updated.");
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -63,8 +61,6 @@ function ProfileInner() {
         </div>
 
         <form className="form" onSubmit={save}>
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          {message && <Notice type="ok">{message}</Notice>}
           <label>
             Display name
             <input

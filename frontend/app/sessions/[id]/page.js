@@ -3,21 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { ErrorMessage, Loading, Notice } from "../../../components/ui";
+import { ErrorMessage, Loading } from "../../../components/ui";
 import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 import { formatDate, formatPrice } from "../../../lib/format";
+import { useToast } from "../../../lib/toast-context";
 
 export default function SessionDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+  const toast = useToast();
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(false);
-  const [notice, setNotice] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -32,16 +33,15 @@ export default function SessionDetailPage() {
 
   const book = async () => {
     setBooking(true);
-    setNotice(null);
     try {
       await apiFetch("/bookings/", {
         method: "POST",
         body: { session: Number(id) },
       });
-      setNotice({ type: "ok", msg: "Booked! Find it under My Bookings." });
+      toast.success("Booked! Find it under My Bookings.");
       load();
     } catch (e) {
-      setNotice({ type: "error", msg: e.message });
+      toast.error(e.message);
     } finally {
       setBooking(false);
     }
@@ -90,7 +90,7 @@ export default function SessionDetailPage() {
               disabled={full || booking}
               onClick={book}
             >
-              {booking ? "Booking…" : full ? "Sold out" : "Book this session"}
+              {booking ? "Booking…" : full ? "Sold out" : "Book Now"}
             </button>
           ) : (
             <button
@@ -101,7 +101,6 @@ export default function SessionDetailPage() {
             </button>
           )}
         </div>
-        {notice && <Notice type={notice.type === "ok" ? "ok" : "error"}>{notice.msg}</Notice>}
       </div>
     </div>
   );

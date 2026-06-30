@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import SessionCard from "../components/SessionCard";
 import { EmptyState, ErrorMessage, Loading } from "../components/ui";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../lib/auth-context";
 
 export default function HomePage() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,6 +47,15 @@ export default function HomePage() {
           onChange={(e) => setQuery(e.target.value)}
         />
       </section>
+
+      {!authLoading && !isAuthenticated && (
+        <div className="cta-banner">
+          <span>Sign in to book sessions and track your bookings.</span>
+          <Link href="/login" className="btn primary sm">
+            Sign in with GitHub
+          </Link>
+        </div>
+      )}
 
       {loading ? (
         <Loading label="Loading catalog…" />

@@ -7,8 +7,10 @@ import SessionForm from "../../components/SessionForm";
 import { EmptyState, ErrorMessage, Loading } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
 import { formatDate, formatPrice } from "../../lib/format";
+import { useToast } from "../../lib/toast-context";
 
 function CreatorInner() {
+  const toast = useToast();
   const [sessions, setSessions] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,13 +62,16 @@ function CreatorInner() {
           method: "PATCH",
           body: data,
         });
+        toast.success("Session updated.");
       } else {
         await apiFetch("/sessions/", { method: "POST", body: data });
+        toast.success("Session created.");
       }
       setShowForm(false);
       await load();
     } catch (e) {
       setFormError(e.message);
+      toast.error(e.message);
     } finally {
       setSubmitting(false);
     }
@@ -77,8 +82,9 @@ function CreatorInner() {
     try {
       await apiFetch(`/sessions/${id}/`, { method: "DELETE" });
       setSessions((ss) => ss.filter((s) => s.id !== id));
+      toast.success("Session deleted.");
     } catch (e) {
-      setError(e.message);
+      toast.error(e.message);
     }
   };
 
@@ -118,20 +124,23 @@ function CreatorInner() {
               Create your first session to start taking bookings.
             </EmptyState>
           ) : (
-            <div className="list">
+            <div className="table sessions">
+              <div className="thead">
+                <span>Title</span>
+                <span>When</span>
+                <span>Price</span>
+                <span>Booked</span>
+                <span />
+              </div>
               {sessions.map((s) => (
-                <div key={s.id} className="row card">
-                  <div>
-                    <h3>{s.title}</h3>
-                    <div className="meta">
-                      <span>🗓 {formatDate(s.datetime)}</span>
-                      <span>{formatPrice(s.price)}</span>
-                      <span>
-                        {s.booked_count}/{s.capacity} booked
-                      </span>
-                    </div>
-                  </div>
-                  <div className="row-actions">
+                <div key={s.id} className="trow">
+                  <span>{s.title}</span>
+                  <span>{formatDate(s.datetime)}</span>
+                  <span>{formatPrice(s.price)}</span>
+                  <span>
+                    {s.booked_count}/{s.capacity}
+                  </span>
+                  <span className="cell-actions">
                     <button className="btn ghost sm" onClick={() => openEdit(s)}>
                       Edit
                     </button>
@@ -141,7 +150,7 @@ function CreatorInner() {
                     >
                       Delete
                     </button>
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
@@ -165,9 +174,7 @@ function CreatorInner() {
                   <span>{b.user_name || b.user_username}</span>
                   <span>{b.session_title}</span>
                   <span>{formatDate(b.session_datetime)}</span>
-                  <span
-                    className={`pill ${b.is_past ? "muted-pill" : "ok"}`}
-                  >
+                  <span className={`pill ${b.is_past ? "muted-pill" : "ok"}`}>
                     {b.is_past ? "Past" : "Upcoming"}
                   </span>
                 </div>

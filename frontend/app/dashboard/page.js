@@ -6,7 +6,33 @@ import Link from "next/link";
 import Protected from "../../components/Protected";
 import { EmptyState, ErrorMessage, Loading } from "../../components/ui";
 import { apiFetch } from "../../lib/api";
+import { useAuth } from "../../lib/auth-context";
 import { formatDate, formatPrice } from "../../lib/format";
+import { useToast } from "../../lib/toast-context";
+
+function ProfileSection({ user }) {
+  const initial = (user?.name || user?.username || "?")[0].toUpperCase();
+  return (
+    <div className="card profile-summary">
+      <div className="who">
+        {user?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.avatar} alt="" className="avatar-lg" />
+        ) : (
+          <div className="avatar-lg placeholder">{initial}</div>
+        )}
+        <div>
+          <h2>{user?.name || user?.username}</h2>
+          <p className="muted">{user?.email || "No email on file"}</p>
+          <span className="badge">{user?.role}</span>
+        </div>
+      </div>
+      <Link href="/profile" className="btn ghost sm">
+        Edit profile
+      </Link>
+    </div>
+  );
+}
 
 function BookingRow({ booking, onCancel, cancelling }) {
   const s = booking.session_detail;
@@ -40,6 +66,8 @@ function BookingRow({ booking, onCancel, cancelling }) {
 }
 
 function DashboardInner() {
+  const { user } = useAuth();
+  const toast = useToast();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,8 +89,9 @@ function DashboardInner() {
     try {
       await apiFetch(`/bookings/${bookingId}/`, { method: "DELETE" });
       setBookings((bs) => bs.filter((b) => b.id !== bookingId));
+      toast.success("Booking cancelled.");
     } catch (e) {
-      setError(e.message);
+      toast.error(e.message);
     } finally {
       setCancellingId(null);
     }
@@ -73,7 +102,11 @@ function DashboardInner() {
 
   return (
     <div className="container">
-      <h1>My Bookings</h1>
+      <h1>My Dashboard</h1>
+
+      <ProfileSection user={user} />
+
+      <h2 className="section-title">My Bookings</h2>
       {loading ? (
         <Loading label="Loading your bookings…" />
       ) : error ? (
@@ -84,7 +117,7 @@ function DashboardInner() {
         </EmptyState>
       ) : (
         <>
-          <h2 className="section-title">Upcoming ({upcoming.length})</h2>
+          <h3 className="section-title">Upcoming ({upcoming.length})</h3>
           {upcoming.length ? (
             <div className="list">
               {upcoming.map((b) => (
@@ -100,7 +133,7 @@ function DashboardInner() {
             <p className="muted">Nothing upcoming.</p>
           )}
 
-          <h2 className="section-title">Past ({past.length})</h2>
+          <h3 className="section-title">Past ({past.length})</h3>
           {past.length ? (
             <div className="list">
               {past.map((b) => (

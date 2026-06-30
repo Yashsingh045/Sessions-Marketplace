@@ -44,13 +44,15 @@
 - API wrapper (`lib/api.js`): attaches Bearer token, on 401 does a single silent `/auth/token/refresh/` then retries; on refresh failure clears tokens + fires auth-failure handler; normalizes DRF error shapes (`detail`/`non_field_errors`/field errors) to a message.
 - Route protection: `<Protected role?>` client guard redirects unauthenticated → `/login`, wrong-role → `/`. Creator pages gated on `role==='CREATOR'`.
 - OAuth callback: `/auth/callback` reads tokens from the URL **fragment**, stores them, scrubs the URL via `history.replaceState`, routes by role (CREATOR→/creator, USER→/dashboard).
+- Toasts: app-wide `ToastProvider`/`useToast` (fixed bottom-right, auto-dismiss ~3.8s, ok/error/info, click-to-close) wrapping the tree above AuthProvider; all mutations (book, cancel, session create/edit/delete, profile save) report via toast. Inline alerts kept only for in-form/load errors.
+- Page polish: Home shows a login CTA banner when logged out; User Dashboard leads with a profile summary card (avatar/name/email/role + Edit link); Creator "My sessions" is a responsive CRUD table (Title/When/Price/Booked/Actions).
 (Record every architectural decision here with a one-line reason.)
 
 ## Scoring Map (track what earns points)
 - [~] Architecture & Docker — 20  (scaffold + compose verified booting; features pending)
 - [x] Auth & Roles (OAuth + JWT, enforcement) — 20  (backend + frontend auth flow done; needs live GitHub creds for full e2e)
 - [x] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + all frontend pages done & building)
-- [~] Frontend UX (responsive, error handling) — 15  (responsive design system, loading/error/empty states throughout; pending real-data polish)
+- [x] Frontend UX (responsive, error handling) — 15  (responsive design system, loading/error/empty states + toasts throughout; needs live OAuth for full click-through)
 - [ ] Code Quality & Docs (.env.example, README) — 15
 - [ ] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)
 
@@ -61,6 +63,17 @@ Infra: [x] docker-compose  [x] nginx  [x] MinIO (container+bucket)  [x] .env.exa
 Bonus: [ ] Razorpay payment flow  [~] rate limiting (DRF throttles wired, scopes TBD)  [ ] MinIO avatar uploads
 
 ## Changelog
+- 2026-06-30 — Page polish vs API: toasts, login CTA, dashboard profile section, creator table.
+  - New `lib/toast-context.js` (ToastProvider/useToast); wired into `layout.js` above AuthProvider; toast styles in `globals.css`.
+  - Home: login CTA banner when logged out. Session detail: book → success/error toast (replaced inline notice), "Book Now" label. User Dashboard: profile summary card (avatar/name/email/role + Edit) above bookings; cancel → toast. Creator: My-sessions rendered as responsive CRUD table (Title/When/Price/Booked/Actions); create/edit/delete → toasts. Profile: save → toast (replaced inline message).
+  - Added CSS: `.toast*`, `.cta-banner`, `.profile-summary`, `.table.sessions` + mobile rules.
+  - VERIFIED: `docker compose build frontend` compiles clean (9/9 static); all routes 200 via nginx; new UI strings present in shipped JS bundles ("Sign in to book…", "Booking cancelled", "Session created", "Edit profile", "toast-wrap"); authenticated `/api/me/` + `/api/bookings/` round-trip 200 with a minted demo_user token. Full click-through still needs live GitHub OAuth creds.
+- 2026-06-30 — Next.js frontend (client-side only): all pages + auth flow.
+  - `lib/`: `config` (API base + token keys), `jwt` (decode/expiry), `api` (Bearer + silent-refresh-on-401 + DRF error normalize + tokenStore), `auth-context` (AuthProvider/useAuth, hydrate via /me, applyUser syncs role), `format`.
+  - `components/`: Navbar (role-aware links), SessionCard, SessionForm (create/edit), Protected (route guard w/ optional role), ui (Loading/ErrorMessage/Notice/EmptyState).
+  - Pages: `/` Home/Catalog (search + grid), `/sessions/[id]` detail+book, `/login` (GitHub as USER/CREATOR), `/auth/callback` (fragment→store→route-by-role), `/dashboard` (user bookings, upcoming/past, cancel), `/creator` (my sessions CRUD + bookings overview), `/profile` (edit name/avatar/role).
+  - `globals.css` hand-written responsive dark design system; `layout.js` wraps AuthProvider+Navbar+footer.
+  - VERIFIED: `docker compose build frontend` succeeds (all 8 routes compile; 7 static + dynamic `/sessions/[id]`); on running stack every route returns 200 via nginx; home renders hero, login renders role buttons; `NEXT_PUBLIC_API_BASE_URL=http://localhost/api` baked into bundle; public `/api/sessions/` reachable same-origin. NOTE: full OAuth round-trip needs real GitHub creds in `.env` (flow wired end-to-end, not yet exercised live).
 - 2026-06-30 — REST API completion + demo seed.
   - Added `GET/PATCH /api/me/` (spec alias alongside `/api/auth/me/`).
   - Added `GET /api/creator/bookings/` (`CreatorBookingsView` + `IsCreatorRole` + `CreatorBookingSerializer`): creator sees who booked their sessions; `?session=<id>` filter.
