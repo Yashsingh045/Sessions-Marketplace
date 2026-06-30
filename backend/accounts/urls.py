@@ -9,4 +9,6 @@ urlpatterns = [
     path("auth/github/exchange/", views.github_exchange, name="github-exchange"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("auth/me/", views.me, name="me"),
+    # Spec-required short alias for the profile endpoint.
+    path("me/", views.me, name="me-short"),
 ]

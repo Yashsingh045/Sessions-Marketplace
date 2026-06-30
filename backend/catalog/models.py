@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Session(models.Model):
@@ -60,6 +61,12 @@ class Booking(models.Model):
                 fields=["user", "session"], name="unique_user_session_booking"
             )
         ]
+
+    @property
+    def is_past(self):
+        """Temporal flag derived from the session time — accurate regardless of
+        the stored status field."""
+        return self.session.datetime < timezone.now()
 
     def __str__(self):
         return f"{self.user} → {self.session} [{self.status}]"

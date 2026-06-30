@@ -12,4 +12,9 @@ echo "Postgres is up."
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput || true
 
+# Optional demo seed (idempotent). Toggle with SEED_DEMO_DATA in .env.
+case "${SEED_DEMO_DATA:-false}" in
+  [Tt]rue|1|yes) python manage.py seed_demo || true ;;
+esac
+
 exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3

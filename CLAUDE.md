@@ -35,23 +35,33 @@
 - Role in token: JWT carries `role`, `username`, `name` claims (set on refresh, copied to access by SimpleJWT) so authz needs no extra DB lookup.
 - Role management: `PATCH /api/auth/me` lets a USER self-upgrade to CREATOR (demo-friendly "become a creator"); new users can also be created as CREATOR via `?role=CREATOR` round-tripped through OAuth `state`.
 - Booking integrity: unique (user, session) constraint + serializer guards for duplicate booking and full-capacity (`seats_left`).
+- Profile route: exposed at both `/api/me/` (spec) and `/api/auth/me/` (auth group); same view.
+- Creator overview: `GET /api/creator/bookings/` (CREATOR-only via `IsCreatorRole`) lists bookings across the creator's sessions with booker identity (`CreatorBookingSerializer`); supports `?session=<id>`.
+- Booking temporal flag: `Booking.is_past` derived from `session.datetime` (accurate regardless of stored `status`); user bookings support `?status=ACTIVE|PAST`.
+- Demo seeding: idempotent `seed_demo` mgmt command (1 CREATOR, 1 USER, 4 sessions incl. one past + 2 bookings); auto-runs on container start when `SEED_DEMO_DATA=true`.
 (Record every architectural decision here with a one-line reason.)
 
 ## Scoring Map (track what earns points)
 - [~] Architecture & Docker — 20  (scaffold + compose verified booting; features pending)
 - [~] Auth & Roles (OAuth + JWT, enforcement) — 20  (backend done + verified; frontend auth UI pending)
-- [ ] Core Features (sessions CRUD, booking, dashboards) — 30
+- [~] Core Features (sessions CRUD, booking, dashboards) — 30  (REST API + seed done & verified; frontend pages pending)
 - [ ] Frontend UX (responsive, error handling) — 15
 - [ ] Code Quality & Docs (.env.example, README) — 15
 - [ ] Bonus: Razorpay payments + rate limiting + MinIO uploads — +15 (capped)
 
 ## Progress Tracker
 Five pages: [ ] Home/Catalog  [ ] Session Detail  [ ] Auth Flow  [ ] User Dashboard  [ ] Creator Dashboard
-Backend: [x] models  [x] GitHub OAuth+JWT  [x] endpoints  [x] permissions  [ ] seed data
+Backend: [x] models  [x] GitHub OAuth+JWT  [x] endpoints  [x] permissions  [x] seed data
 Infra: [x] docker-compose  [x] nginx  [x] MinIO (container+bucket)  [x] .env.example  [x] README
 Bonus: [ ] Razorpay payment flow  [~] rate limiting (DRF throttles wired, scopes TBD)  [ ] MinIO avatar uploads
 
 ## Changelog
+- 2026-06-30 — REST API completion + demo seed.
+  - Added `GET/PATCH /api/me/` (spec alias alongside `/api/auth/me/`).
+  - Added `GET /api/creator/bookings/` (`CreatorBookingsView` + `IsCreatorRole` + `CreatorBookingSerializer`): creator sees who booked their sessions; `?session=<id>` filter.
+  - `Booking.is_past` property (derived from session datetime) surfaced in serializers; `GET /api/bookings/?status=ACTIVE|PAST` filter.
+  - `seed_demo` management command (catalog) — idempotent: 1 CREATOR, 1 USER, 4 sessions (incl. a past one), 2 bookings (ACTIVE+PAST). Wired into `entrypoint.sh` behind `SEED_DEMO_DATA` (added to .env/.env.example, default True).
+  - VERIFIED on clean stack: seed populated 4 sessions/2 bookings; `/api/me/` GET+PATCH 200; user bookings show active+past with is_past; `?status` filter works; `creator/bookings` → anon 401 / USER 403 / CREATOR 200 with booker identity; session POST USER→403 CREATOR→201, owner PATCH→200, DELETE→204. Full sessions catalog public read OK.
 - 2026-06-30 — Backend foundation: models, GitHub OAuth→JWT, role permissions, admin.
   - `accounts` app: custom `User` (role USER/CREATOR, name, avatar=MinIO URL/key, github_id); `tokens.get_tokens_for_user` mints JWT pair with `role` claim; views for GitHub OAuth (`login` URL builder, `callback` redirect-with-fragment, `exchange` JSON-for-SPA), `me` (GET/PATCH self-upgrade), SimpleJWT `token/refresh`. UserSerializer + admin (extends UserAdmin).
   - `catalog` app: `Session` (title/desc/creator FK/datetime/price/capacity, booked_count+seats_left props) and `Booking` (user/session FK, status ACTIVE/PAST, created_at, unique (user,session)); ModelViewSets + DefaultRouter; `IsCreatorOrReadOnly` permission (creator-only writes, owner-only edits); booking duplicate/capacity guards; `?mine=1` creator filter; admin registered.

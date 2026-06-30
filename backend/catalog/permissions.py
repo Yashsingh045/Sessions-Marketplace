@@ -22,3 +22,16 @@ class IsCreatorOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return obj.creator_id == request.user.id
+
+
+class IsCreatorRole(BasePermission):
+    """Hard gate: the requester must be an authenticated CREATOR."""
+
+    message = "Only creators can access this resource."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == User.Role.CREATOR
+        )
